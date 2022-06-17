@@ -41,14 +41,14 @@ static char *adjust_shm_path(const char *orig_path) {
 
 // overrides
 
-int setgroups(size_t, const gid_t *) {
+int setgroups(size_t size, const gid_t *list) {
   return orig_setgroups(0, NULL);
 }
 
 // this is only needed until there's proper support in snapd for initgroups()
 // see https://forum.snapcraft.io/t/seccomp-filtering-for-setgroups/2109 for
 // more info.
-int initgroups(const char *, gid_t) {
+int initgroups(const char *user, gid_t group) {
   return setgroups(0, NULL);
 }
 
