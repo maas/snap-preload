@@ -9,7 +9,7 @@ Currently the library overrides the following functions:
   `snap.$SNAP_INSTANCE_NAME.`, as required by snaps
 
 
-## Compile
+## Manual install
 
 To build and install the library run
 
