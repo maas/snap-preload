@@ -18,7 +18,7 @@ static int (*orig_shm_open)(const char *name, int oflag, mode_t mode);
 static int (*orig_shm_unlink)(const char *name);
 
 // contants set at library init time
-static char *SNAP_NAME;
+static char *SNAP_INSTANCE_NAME;
 static int DEBUG = 0;
 
 
@@ -26,16 +26,16 @@ static int DEBUG = 0;
 
 #define log(FORMAT, ...) if (DEBUG) {fprintf(stderr, "snap-preload: " FORMAT "\n", __VA_ARGS__);}
 
-static void exit_error(char *message) {
-  fprintf(stderr, "error: %s\n", message);
-  exit(-1);
-}
-
 static char *adjust_shm_path(const char *orig_path) {
-  const char *path = (orig_path[0] == '/') ? &(orig_path[1]) : orig_path;
   char *new_path = malloc(PATH_MAX);
-  snprintf(new_path, PATH_MAX, "/snap.%s.%s", SNAP_NAME, path);
-  log("shm path rewritten: %s -> %s", orig_path, new_path);
+  if (SNAP_INSTANCE_NAME) {
+    const char *path = (orig_path[0] == '/') ? &(orig_path[1]) : orig_path;
+
+    snprintf(new_path, PATH_MAX, "/snap.%s.%s", SNAP_INSTANCE_NAME, path);
+    log("shm path rewritten: %s -> %s", orig_path, new_path);
+  } else {
+    new_path = strcpy(new_path, orig_path);
+  }
   return new_path;
 }
 
@@ -71,10 +71,7 @@ int shm_unlink(const char *name) {
 
 // library init
 static void __attribute__ ((constructor)) init(void) {
-  SNAP_NAME = secure_getenv("SNAP_INSTANCE_NAME");
-  if (! SNAP_NAME) {
-    exit_error("SNAP_INSTANCE_NAME not defined");
-  }
+  SNAP_INSTANCE_NAME = secure_getenv("SNAP_INSTANCE_NAME");
   if (secure_getenv("SNAP_PRELOAD_DEBUG")) {
     DEBUG = 1;
   }
