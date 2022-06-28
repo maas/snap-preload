@@ -10,12 +10,12 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: 
+        platform:
         - ubuntu-22.04
         - ubuntu-20.04
 
     runs-on: ${{ matrix.platform }}
-    
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v3

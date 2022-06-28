@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,14 +28,15 @@ static int DEBUG = 0;
 #define log(FORMAT, ...) if (DEBUG) {fprintf(stderr, "snap-preload: " FORMAT "\n", __VA_ARGS__);}
 
 static char *adjust_shm_path(const char *orig_path) {
-  char *new_path = malloc(PATH_MAX);
+  int path_len = strlen(orig_path) + strlen(SNAP_INSTANCE_NAME) + strlen("/snap..") + 1;
+  char *new_path = malloc(path_len);
+  assert(new_path != NULL);
   if (SNAP_INSTANCE_NAME) {
     const char *path = (orig_path[0] == '/') ? &(orig_path[1]) : orig_path;
-
-    snprintf(new_path, PATH_MAX, "/snap.%s.%s", SNAP_INSTANCE_NAME, path);
+    snprintf(new_path, path_len , "/snap.%s.%s", SNAP_INSTANCE_NAME, path);
     log("shm path rewritten: %s -> %s", orig_path, new_path);
   } else {
-    new_path = strcpy(new_path, orig_path);
+    new_path = strncpy(new_path, orig_path, path_len);
   }
   return new_path;
 }
