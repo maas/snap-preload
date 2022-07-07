@@ -27,6 +27,9 @@ static int DEBUG = 0;
 
 #define log(FORMAT, ...) if (DEBUG) {fprintf(stderr, "snap-preload: " FORMAT "\n", __VA_ARGS__);}
 
+// Snapd only allows applications to access shared memory paths that match the
+// snap.$SNAP_INSTANCE_NAME.* format. This rewrites paths so that applications
+// don't need changes to conform
 static char *adjust_shm_path(const char *orig_path) {
   int path_len = strlen(orig_path) + strlen(SNAP_INSTANCE_NAME) + strlen("/snap..") + 1;
   char *new_path = malloc(path_len);
@@ -47,7 +50,7 @@ int setgroups(size_t size, const gid_t *list) {
   return orig_setgroups(0, NULL);
 }
 
-// this is only needed until there's proper support in snapd for initgroups()
+// This is only needed until there's proper support in snapd for initgroups()
 // see https://forum.snapcraft.io/t/seccomp-filtering-for-setgroups/2109 for
 // more info.
 int initgroups(const char *user, gid_t group) {
