@@ -73,16 +73,7 @@ int shm_unlink(const char *name) {
 }
 
 
-// library init
-static void __attribute__ ((constructor)) init(void) {
-  if (secure_getenv("SNAP_PRELOAD_DEBUG")) {
-    DEBUG = 1;
-  }
-
-  SAVE_ORIGINAL_SYMBOL(setgroups);
-  SAVE_ORIGINAL_SYMBOL(shm_open);
-  SAVE_ORIGINAL_SYMBOL(shm_unlink);
-
+static void init_snap_instance_name(){
   char *env_value = secure_getenv("SNAP_INSTANCE_NAME");
   if (env_value == NULL){
     log("SNAP_INSTANCE_NAME is empty");
@@ -97,4 +88,18 @@ static void __attribute__ ((constructor)) init(void) {
   }
 
   stpcpy(SNAP_INSTANCE_NAME, env_value);
+}
+
+
+// library init
+static void __attribute__ ((constructor)) init(void) {
+  if (secure_getenv("SNAP_PRELOAD_DEBUG")) {
+    DEBUG = 1;
+  }
+
+  SAVE_ORIGINAL_SYMBOL(setgroups);
+  SAVE_ORIGINAL_SYMBOL(shm_open);
+  SAVE_ORIGINAL_SYMBOL(shm_unlink);
+
+  init_snap_instance_name();
 }  
