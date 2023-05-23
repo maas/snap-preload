@@ -83,8 +83,8 @@ static void init_snap_instance_name(){
   // Store the snap instance name in the heap because of https://bugs.launchpad.net/maas/+bug/2020427
   SNAP_INSTANCE_NAME = malloc(strlen(env_value));
   if (SNAP_INSTANCE_NAME == NULL) {
-      log("Failed to allocate memory for SNAP_INSTANCE_NAME");
-      return;
+    log("Failed to allocate memory for SNAP_INSTANCE_NAME");
+    return;
   }
 
   stpcpy(SNAP_INSTANCE_NAME, env_value);
