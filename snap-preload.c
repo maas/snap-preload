@@ -19,13 +19,12 @@ static int (*orig_shm_open)(const char *name, int oflag, mode_t mode);
 static int (*orig_shm_unlink)(const char *name);
 
 // contants set at library init time
-static char *SNAP_INSTANCE_NAME;
+static char *SNAP_INSTANCE_NAME = NULL;
 static int DEBUG = 0;
-
 
 #define SAVE_ORIGINAL_SYMBOL(SYM) orig_##SYM = dlsym(RTLD_NEXT, #SYM)
 
-#define log(FORMAT, ...) if (DEBUG) {fprintf(stderr, "snap-preload: " FORMAT "\n", __VA_ARGS__);}
+#define log(FORMAT, ...) if (DEBUG) {fprintf(stderr, "snap-preload: " FORMAT "\n", ##__VA_ARGS__);}
 
 // Snapd only allows applications to access shared memory paths that match the
 // snap.$SNAP_INSTANCE_NAME.* format. This rewrites paths so that applications
@@ -74,9 +73,26 @@ int shm_unlink(const char *name) {
 }
 
 
+static void init_snap_instance_name(){
+  char *env_value = secure_getenv("SNAP_INSTANCE_NAME");
+  if (env_value == NULL){
+    log("SNAP_INSTANCE_NAME is empty");
+    return;
+  }
+
+  // Store the snap instance name in the heap because of https://bugs.launchpad.net/maas/+bug/2020427
+  SNAP_INSTANCE_NAME = malloc(strlen(env_value));
+  if (SNAP_INSTANCE_NAME == NULL) {
+    log("Failed to allocate memory for SNAP_INSTANCE_NAME");
+    return;
+  }
+
+  stpcpy(SNAP_INSTANCE_NAME, env_value);
+}
+
+
 // library init
 static void __attribute__ ((constructor)) init(void) {
-  SNAP_INSTANCE_NAME = secure_getenv("SNAP_INSTANCE_NAME");
   if (secure_getenv("SNAP_PRELOAD_DEBUG")) {
     DEBUG = 1;
   }
@@ -84,4 +100,6 @@ static void __attribute__ ((constructor)) init(void) {
   SAVE_ORIGINAL_SYMBOL(setgroups);
   SAVE_ORIGINAL_SYMBOL(shm_open);
   SAVE_ORIGINAL_SYMBOL(shm_unlink);
-}
+
+  init_snap_instance_name();
+}  
