@@ -105,5 +105,4 @@ static void __attribute__ ((constructor)) init(void) {
   }
 
   strncpy(SNAP_INSTANCE_NAME, env_value, env_value_len);
-  SNAP_INSTANCE_NAME[env_value_len] = '\0';
 }  
