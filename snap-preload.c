@@ -26,6 +26,65 @@ static int DEBUG = 0;
 
 #define log(FORMAT, ...) if (DEBUG) {fprintf(stderr, "snap-preload: " FORMAT "\n", ##__VA_ARGS__);}
 
+
+// Return the snap instance name from the application cgroup.
+char *snap_instance_name() {
+  FILE *fp;
+  char *line = NULL;
+  char *sub = NULL;
+  char *name = NULL;
+  size_t len = 0;
+
+  fp = fopen("/proc/self/cgroup", "r");
+  if (fp == NULL) {
+    return NULL;
+  }
+
+  // find cgroup 0
+  while (getline(&line, &len, fp) > 0) {
+    if (line[0] == '0') {
+      break;
+    }
+  }
+  if (line[0] != '0') {
+    goto out;
+  }
+
+  // look for the snap name prefix
+  sub = strrchr(line, '/');
+  if (!sub) {
+    goto out;
+  }
+  if (strncmp(sub, "/snap.", 6)) {
+    goto out;
+  }
+  sub += 6;
+
+  // extract the snap instance name
+  char *end = strchr(sub, '.');
+  if (! end) {
+    goto out;
+  }
+  *end = '\0';
+
+  len = end - sub;
+  name = malloc(len + 1);
+  if (!name) {
+    goto out;
+  }
+  strncpy(name, sub, len);
+  name[len] = '\0';
+
+ out:
+  fclose(fp);
+  if (line) {
+    free(line);
+  }
+  
+  return name;
+}
+
+
 // Snapd only allows applications to access shared memory paths that match the
 // snap.$SNAP_INSTANCE_NAME.* format. This rewrites paths so that applications
 // don't need changes to conform
@@ -72,34 +131,18 @@ int shm_unlink(const char *name) {
   return res;
 }
 
-
-static void init_snap_instance_name(){
-  char *env_value = secure_getenv("SNAP_INSTANCE_NAME");
-  if (env_value == NULL){
-    log("SNAP_INSTANCE_NAME is empty");
-    return;
-  }
-
-  // Store the snap instance name in the heap because of https://bugs.launchpad.net/maas/+bug/2020427
-  SNAP_INSTANCE_NAME = malloc(strlen(env_value));
-  if (SNAP_INSTANCE_NAME == NULL) {
-    log("Failed to allocate memory for SNAP_INSTANCE_NAME");
-    return;
-  }
-
-  stpcpy(SNAP_INSTANCE_NAME, env_value);
-}
-
-
 // library init
 static void __attribute__ ((constructor)) init(void) {
   if (secure_getenv("SNAP_PRELOAD_DEBUG")) {
     DEBUG = 1;
   }
 
+  SNAP_INSTANCE_NAME = snap_instance_name();
+  if (!SNAP_INSTANCE_NAME) {
+    log("snap instance name not identified from cgroup");
+  }
+
   SAVE_ORIGINAL_SYMBOL(setgroups);
   SAVE_ORIGINAL_SYMBOL(shm_open);
   SAVE_ORIGINAL_SYMBOL(shm_unlink);
-
-  init_snap_instance_name();
 }  
