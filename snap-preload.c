@@ -28,6 +28,10 @@ static int DEBUG = 0;
 
 
 // Return the snap instance name from the application cgroup.
+// The line for the `0` entry ends with a scope name in the format:
+//
+//  /snap.<snap instance name>.<snap-command>.<uuid>.scope
+//
 char *snap_instance_name() {
   FILE *fp;
   char *line = NULL;
@@ -41,10 +45,8 @@ char *snap_instance_name() {
   }
 
   // find cgroup 0
-  while (getline(&line, &len, fp) > 0) {
-    if (line[0] == '0') {
-      break;
-    }
+  if (getline(&line, &len, fp) <= 0) {
+    goto out;
   }
   if (line[0] != '0') {
     goto out;
@@ -52,10 +54,7 @@ char *snap_instance_name() {
 
   // look for the snap name prefix
   sub = strrchr(line, '/');
-  if (!sub) {
-    goto out;
-  }
-  if (strncmp(sub, "/snap.", 6)) {
+  if (!sub || strncmp(sub, "/snap.", 6)) {
     goto out;
   }
   sub += 6;
