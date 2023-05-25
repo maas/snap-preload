@@ -32,11 +32,11 @@ static int DEBUG = 0;
 //
 //  /snap.<snap instance name>.<snap-command>.<uuid>.scope
 //
-char *snap_instance_name() {
-  FILE *fp;
-  char *line = NULL;
-  char *sub = NULL;
-  char *name = NULL;
+char* snap_instance_name() {
+  FILE* fp;
+  char* line = NULL;
+  char* sub = NULL;
+  char* name = NULL;
   size_t len = 0;
 
   fp = fopen("/proc/self/cgroup", "r");
@@ -44,42 +44,30 @@ char *snap_instance_name() {
     return NULL;
   }
 
-  // find cgroup 0
-  if (getline(&line, &len, fp) <= 0) {
-    goto out;
-  }
-  if (line[0] != '0') {
-    goto out;
+  // Find cgroup 0
+  if (getline(&line, &len, fp) > 0 && line[0] == '0') {
+    // Look for the snap name prefix
+    sub = strrchr(line, '/');
+    if (sub && strncmp(sub, "/snap.", 6) == 0) {
+      sub += 6;
+
+      // Extract the snap instance name
+      char* end = strchr(sub, '.');
+      if (end) {
+        *end = '\0';
+        len = end - sub;
+        name = malloc(len + 1);
+        if (name) {
+          strncpy(name, sub, len);
+          name[len] = '\0';
+        }
+      }
+    }
   }
 
-  // look for the snap name prefix
-  sub = strrchr(line, '/');
-  if (!sub || strncmp(sub, "/snap.", 6)) {
-    goto out;
-  }
-  sub += 6;
-
-  // extract the snap instance name
-  char *end = strchr(sub, '.');
-  if (! end) {
-    goto out;
-  }
-  *end = '\0';
-
-  len = end - sub;
-  name = malloc(len + 1);
-  if (!name) {
-    goto out;
-  }
-  strncpy(name, sub, len);
-  name[len] = '\0';
-
- out:
   fclose(fp);
-  if (line) {
-    free(line);
-  }
-  
+  free(line);
+
   return name;
 }
 
