@@ -13,14 +13,14 @@
 #include <linux/limits.h>
 #include <string.h>
 
+// contants set at library init time
+static char *SNAP_INSTANCE_NAME = NULL;
+static int DEBUG = 0;
+
 // original functions
 static int (*orig_setgroups)(size_t size, const gid_t *list);
 static int (*orig_shm_open)(const char *name, int oflag, mode_t mode);
 static int (*orig_shm_unlink)(const char *name);
-
-// contants set at library init time
-static char *SNAP_INSTANCE_NAME = NULL;
-static int DEBUG = 0;
 
 #define SAVE_ORIGINAL_SYMBOL(SYM) orig_##SYM = dlsym(RTLD_NEXT, #SYM)
 
@@ -70,24 +70,26 @@ char* snap_instance_name() {
 // snap.$SNAP_INSTANCE_NAME.* format. This rewrites paths so that applications
 // don't need changes to conform
 static char *adjust_shm_path(const char *orig_path) {
-  int path_len = strlen(orig_path) + strlen(SNAP_INSTANCE_NAME) + strlen("/snap..") + 1;
-  char *new_path = malloc(path_len);
-  assert(new_path != NULL);
-  if (SNAP_INSTANCE_NAME) {
-    const char *path = (orig_path[0] == '/') ? &(orig_path[1]) : orig_path;
-    snprintf(new_path, path_len , "/snap.%s.%s", SNAP_INSTANCE_NAME, path);
-    log("shm path rewritten: %s -> %s", orig_path, new_path);
-  } else {
-    new_path = strncpy(new_path, orig_path, path_len);
+  if (!SNAP_INSTANCE_NAME) {
+    return strdup(orig_path);
   }
+
+  int path_len = strlen(orig_path) + strlen(SNAP_INSTANCE_NAME) + 9;
+  char *new_path = malloc(path_len);
+  assert(new_path);
+  const char *path = (orig_path[0] == '/') ? &(orig_path[1]) : orig_path;
+  snprintf(new_path, path_len , "/snap.%s.%s", SNAP_INSTANCE_NAME, path);
+  log("shm path rewritten: %s -> %s", orig_path, new_path);
   return new_path;
 }
+
 
 // overrides
 
 int setgroups(size_t size, const gid_t *list) {
   return orig_setgroups(0, NULL);
 }
+
 
 // This is only needed until there's proper support in snapd for initgroups()
 // see https://forum.snapcraft.io/t/seccomp-filtering-for-setgroups/2109 for
@@ -111,6 +113,7 @@ int shm_unlink(const char *name) {
   free(new_path);
   return res;
 }
+
 
 // library init
 static void __attribute__ ((constructor)) init(void) {
