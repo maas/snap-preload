@@ -40,7 +40,7 @@ char* snap_instance_name() {
   size_t len = 0;
 
   fp = fopen("/proc/self/cgroup", "r");
-  if (fp == NULL) {
+  if (!fp) {
     return NULL;
   }
 
@@ -55,19 +55,13 @@ char* snap_instance_name() {
       char* end = strchr(sub, '.');
       if (end) {
         *end = '\0';
-        len = end - sub;
-        name = malloc(len + 1);
-        if (name) {
-          strncpy(name, sub, len);
-          name[len] = '\0';
-        }
+        name = strdup(sub);
       }
     }
   }
 
   fclose(fp);
   free(line);
-
   return name;
 }
 
