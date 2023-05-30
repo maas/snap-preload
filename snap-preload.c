@@ -45,18 +45,21 @@ char* snap_instance_name() {
   }
 
   // Find cgroup 0
-  if (getline(&line, &len, fp) > 0 && line[0] == '0') {
-    // Look for the snap name prefix
-    sub = strrchr(line, '/');
-    if (sub && strncmp(sub, "/snap.", 6) == 0) {
-      sub += 6;
+  while (getline(&line, &len, fp) > 0 && line[0] != '0') {};
+  if (len < 1 || line[0] != '0') {
+    return NULL;
+  }
 
-      // Extract the snap instance name
-      char* end = strchr(sub, '.');
-      if (end) {
-        *end = '\0';
-        name = strdup(sub);
-      }
+  // Look for the snap name prefix
+  sub = strrchr(line, '/');
+  if (sub && strncmp(sub, "/snap.", 6) == 0) {
+    sub += 6;
+
+    // Extract the snap instance name
+    char* end = strchr(sub, '.');
+    if (end) {
+      *end = '\0';
+      name = strdup(sub);
     }
   }
 
