@@ -47,6 +47,8 @@ char* snap_instance_name() {
   // Find cgroup 0
   while (getline(&line, &len, fp) > 0 && line[0] != '0') {};
   if (len < 1 || line[0] != '0') {
+    fclose(fp);
+    free(line);
     return NULL;
   }
 
