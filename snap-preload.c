@@ -13,8 +13,12 @@
 #include <limits.h>
 #include <linux/limits.h>
 #include <string.h>
+#include <semaphore.h>
 
 #define MAX_SNAP_NAME_SIZE 40
+#define MAX_SEM_NAME_SIZE (NAME_MAX - MAX_SNAP_NAME_SIZE)
+#define SHM_DIR "/dev/shm"
+
 // constants set at library init time
 static char SNAP_INSTANCE_NAME[MAX_SNAP_NAME_SIZE + 1] = {'\0'};
 static int DEBUG = 0;
@@ -23,6 +27,8 @@ static int DEBUG = 0;
 static int (*orig_setgroups)(size_t size, const gid_t *list);
 static int (*orig_shm_open)(const char *name, int oflag, mode_t mode);
 static int (*orig_shm_unlink)(const char *name);
+static sem_t *(*orig_sem_open)(const char *name, int oflag, ...);
+static int (*orig_sem_unlink)(const char *name);
 
 #define SAVE_ORIGINAL_SYMBOL(SYM) orig_##SYM = dlsym(RTLD_NEXT, #SYM)
 
@@ -108,6 +114,83 @@ int shm_unlink(const char *name)
   return orig_shm_unlink(new_path);
 }
 
+sem_t *sem_open(const char *name, int oflag, ...)
+{
+  va_list args;
+  mode_t mode;
+  unsigned int value;
+  int fd;
+  int existed = 0;
+  sem_t initial_sem;
+  sem_t *final_sem;
+  char new_name[MAX_SEM_NAME_SIZE];
+  char sem_path[NAME_MAX];
+  char tmp_path[NAME_MAX];
+
+  adjust_path(new_name, name, sizeof(new_name));
+  log("new_name %s", new_name);
+
+  if (!(oflag & O_CREAT))
+    return orig_sem_open(new_name, oflag);
+
+  va_start(args, oflag);
+  mode = va_arg(args, mode_t);
+  value = va_arg(args, unsigned int);
+  va_end(args);
+  if (value > SEM_VALUE_MAX)
+  {
+    errno = EINVAL;
+    return SEM_FAILED;
+  }
+
+  // glibc creates a tempfile, initializes it, hardlink to the requested name
+  // and finally unlinks the tempfile. Due to snap confinement rules, the first
+  // step fails in the original implementation.
+
+  // create a temporary file
+  snprintf(tmp_path, sizeof(tmp_path), "%s%s.XXXXXX", SHM_DIR, new_name);
+  if ((fd = mkstemp(tmp_path)) < 0)
+    return SEM_FAILED;
+
+  if (fchmod(fd, mode) < 0)
+    goto clean_tmp;
+  sem_init(&initial_sem, 1, value);
+  if (write(fd, &initial_sem, sizeof(sem_t)) < 0)
+    goto clean_tmp;
+  close(fd);
+
+  // new_name is an absolute path, skip the initial '/'
+  snprintf(sem_path, sizeof(sem_path), "%s/sem.%s", SHM_DIR, &(new_name[1]));
+  log("sem_path %s", sem_path);
+  if ((existed = link(tmp_path, sem_path)) < 0)
+  {
+    if (oflag & O_EXCL || errno != EEXIST)
+    {
+      unlink(tmp_path);
+      return SEM_FAILED;
+    }
+  }
+  unlink(tmp_path);
+
+  final_sem = orig_sem_open(new_name, oflag & ~(O_CREAT | O_EXCL));
+  if (final_sem == SEM_FAILED && !existed)
+    unlink(sem_path);
+  return final_sem;
+
+clean_tmp:
+  close(fd);
+  unlink(tmp_path);
+  return SEM_FAILED;
+}
+
+int sem_unlink(const char *name)
+{
+  char new_path[NAME_MAX];
+
+  adjust_path(new_path, name, sizeof(new_path));
+  return orig_sem_unlink(new_path);
+}
+
 // library init
 static __attribute__((constructor)) void init(void)
 {
@@ -124,4 +207,6 @@ static __attribute__((constructor)) void init(void)
   SAVE_ORIGINAL_SYMBOL(setgroups);
   SAVE_ORIGINAL_SYMBOL(shm_open);
   SAVE_ORIGINAL_SYMBOL(shm_unlink);
+  SAVE_ORIGINAL_SYMBOL(sem_open);
+  SAVE_ORIGINAL_SYMBOL(sem_unlink);
 }
