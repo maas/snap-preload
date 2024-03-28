@@ -7,6 +7,7 @@ Currently the library overrides the following functions:
 - `initgroups` and `setgroups` to no-op
 - `shm_open` and `shm_unlink` to prefix the name with
   `snap.$SNAP_INSTANCE_NAME.`, as required by snaps
+- `sem_open` and `sem_unlink`, also fixes the names
 
 
 ## Manual install
